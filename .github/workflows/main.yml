@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  XPOSED_BASE_TAG: xposed-base
+  XPOSED_BASE_TAG: base
   JELLYFIN_VERSION: '10.7.7'
   JELLYFIN_SOURCE_TAG: v10.7.7
   JELLYFIN_BUILD_PLATFORM: portable
@@ -58,6 +58,13 @@ jobs:
         run: |
           git config user.email "<>"
           git config user.name "runner"
+      
+      - name: Remove unnecessary files from history
+        run: >
+          git filter-branch --tree-filter 
+          'rm -rf ./README.md ./.gitignore ./github'
+          --
+          ${{ env.XPOSED_BASE_TAG }}..HEAD
 
       - name: Fetch Jellyfin upstream
         run: |
@@ -66,8 +73,7 @@ jobs:
 
       - name: Rebase onto Jellyfin
         run: |
-          git checkout ${{ env.JELLYFIN_SOURCE_TAG }}
-          git cherry-pick ${{ env.XPOSED_BASE_TAG }}..$GITHUB_SHA
+          git rebase --onto ${{ env.JELLYFIN_SOURCE_TAG }} ${{ env.XPOSED_BASE_TAG }} HEAD
 
       - name: Build Jellyfin web
         run: |
