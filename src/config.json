@@ -44,6 +44,9 @@
     "pdfPlayer/plugin",
     "logoScreensaver/plugin",
     "sessionPlayer/plugin",
-    "chromecastPlayer/plugin"
+    "chromecastPlayer/plugin",
+    "xposed/plugin"
+  ],
+  "loadScripts": [
   ]
 }
