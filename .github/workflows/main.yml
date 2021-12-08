@@ -61,7 +61,7 @@ jobs:
         with:
           # cache based on self sha instead of ref since a push and a tag
           # will trigger two workflows
-          key: ${{ env.GITHUB_SHA }}-${{ JELLYFIN_SOURCE_TAG }}-build
+          key: ${{ github.sha }}-${{ env.JELLYFIN_SOURCE_TAG }}-build
           path: ./artifacts/jellyfin-xposed.tar.gz
 
         # the following steps are based on current sha and produce
@@ -118,4 +118,4 @@ jobs:
         if: github.ref_type == 'tag'
         with:
           files: ./artifacts/jellyfin-xposed.tar.gz
-          name: ${{ env.JELLYFIN_VERSION }}-xp-${{ env.GITHUB_REF_NAME }}
+          name: ${{ env.JELLYFIN_VERSION }}-xp-${{ github.ref_name }}
