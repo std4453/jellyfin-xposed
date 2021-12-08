@@ -114,6 +114,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./artifacts/jellyfin-xposed
+          push: true
           file: ./Dockerfile.Xposed
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
