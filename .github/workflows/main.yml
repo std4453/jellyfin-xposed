@@ -62,7 +62,7 @@ jobs:
           # cache based on self sha instead of ref since a push and a tag
           # will trigger two workflows
           key: ${{ github.sha }}-${{ env.JELLYFIN_SOURCE_TAG }}-build
-          path: ./artifacts/jellyfin-xposed.tar.gz
+          path: ./artifacts/jellyfin-xposed
 
         # the following steps are based on current sha and produce
         # reproduciable results so they are skipped on cache hit
@@ -91,31 +91,37 @@ jobs:
         if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           git rebase --onto ${{ env.JELLYFIN_SOURCE_TAG }} ${{ env.XPOSED_BASE_TAG }} HEAD
-      
-      - name: Build Jellyfin web and rename tarball
+
+      - name: Create artifacts dir
         if: steps.cache-build.outputs.cache-hit != 'true'
+        run: mkdir -p artifacts
+      
+      - name: Build Jellyfin web and extract tarball
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        working-directory: ./artifacts
         run: |
-          SOURCE_DIR=. ARTIFACT_DIR=./artifacts ./deployment/build.${{ env.JELLYFIN_BUILD_PLATFORM }}
-          mv ./artifacts/jellyfin-web_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz ./artifacts/jellyfin-xposed.tar.gz
+          SOURCE_DIR=.. ARTIFACT_DIR=. ../deployment/build.${{ env.JELLYFIN_BUILD_PLATFORM }}
+          tar -xvf ./jellyfin-xposed.tar_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz
+          mv jellyfin-web_${{ env.JELLYFIN_VERSION }} jellyfin-xposed
 
         # the following steps might vary on ref so cannot be skipped
 
-      - name: Untar Jellyfin tarball
-        working-directory: ./artifacts
-        run: tar xvf ./jellyfin-xposed.tar.gz
-      
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
-          context: ./artifacts/jellyfin-web_${{ env.JELLYFIN_VERSION }}
+          context: ./artifacts/jellyfin-xposed
           file: ./Dockerfile.Xposed
-          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Create release tarball
+        if: github.ref_type == 'tag'
+        working-directory: ./artifacts
+        run: tar -czvf jellyfin-xposed.tar.gz jellyfin-xposed
       
       - name: Upload tarball to release
         uses: softprops/action-gh-release@v1
         if: github.ref_type == 'tag'
         with:
           files: ./artifacts/jellyfin-xposed.tar.gz
-          name: ${{ env.JELLYFIN_VERSION }}-xp-${{ github.ref_name }}
+          name: Jellyfin ${{ env.JELLYFIN_VERSION }} (xposed ${{ github.ref_name }})
