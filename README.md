@@ -46,7 +46,7 @@ First you have to divide your Jellyfin deployment into two parts, a.k.a. fronten
 
 Originally, Jellyfin serves the frontend under `web/`, other paths should be sent to the backend. After the splitting, you might need a reverse proxy to serve both parts under one domain. Now verify that your deployment is correct.
 
-Then, you need to replace your `jellyfin-web` files with `jellyfin-xposed` files, you can either replace new files in-place of the old ones, or you can use `ghcr.io/std4453/jellyfin-xposed` docker image (choose your version on the [packages page](https://github.com/std4453/jellyfin-xposed/pkgs/container/jellyfin-xposed)), which serves the frontend on port 80 via [nginx](https://hub.docker.com/_/nginx).
+Then, you need to replace your `jellyfin-web` files with `jellyfin-xposed` files, you can either replace old files in-place with tarballs downloaded from [releases page](https://github.com/std4453/jellyfin-xposed/releases), or you can use `ghcr.io/std4453/jellyfin-xposed` docker image (choose your version on the [packages page](https://github.com/std4453/jellyfin-xposed/pkgs/container/jellyfin-xposed)), which serves the frontend on port 80 via [nginx](https://hub.docker.com/_/nginx).
 
 `jellyfin-xposed` is bundled with a default [`config.json`](src/config.json), which loads no external scripts, you will have to modify the file yourself (if you're hosting it statically), you mount your modified config into the docker container. 
 
