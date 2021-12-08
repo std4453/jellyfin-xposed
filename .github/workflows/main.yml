@@ -96,12 +96,16 @@ jobs:
         if: steps.cache-build.outputs.cache-hit != 'true'
         run: mkdir -p artifacts
       
-      - name: Build Jellyfin web and extract tarball
+      - name: Build Jellyfin web 
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        run: |
+          SOURCE_DIR=. ARTIFACT_DIR=artifacts ./deployment/build.${{ env.JELLYFIN_BUILD_PLATFORM }}
+
+      - name: Extract tarball and rename folder
         if: steps.cache-build.outputs.cache-hit != 'true'
         working-directory: ./artifacts
         run: |
-          SOURCE_DIR=.. ARTIFACT_DIR=. ../deployment/build.${{ env.JELLYFIN_BUILD_PLATFORM }}
-          tar -xvf ./jellyfin-xposed.tar_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz
+          tar -xvf ./jellyfin-web_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz
           mv jellyfin-web_${{ env.JELLYFIN_VERSION }} jellyfin-xposed
 
         # the following steps might vary on ref so cannot be skipped
