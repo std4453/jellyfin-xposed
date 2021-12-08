@@ -55,12 +55,26 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cache build result
+        id: cache-build
+        uses: actions/cache@v2
+        with:
+          # cache based on self sha instead of ref since a push and a tag
+          # will trigger two workflows
+          key: ${{ env.GITHUB_SHA }}-${{ JELLYFIN_SOURCE_TAG }}-build
+          path: ./artifacts/jellyfin-xposed.tar.gz
+
+        # the following steps are based on current sha and produce
+        # reproduciable results so they are skipped on cache hit
+
       - name: Setup git config
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           git config user.email "<>"
           git config user.name "runner"
       
       - name: Remove unnecessary files from history
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: >
           git filter-branch --tree-filter 
           'rm -rf ./README.md ./.gitignore ./github'
@@ -68,21 +82,27 @@ jobs:
           ${{ env.XPOSED_BASE_TAG }}..HEAD
 
       - name: Fetch Jellyfin upstream
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           git remote add jellyfin https://github.com/jellyfin/jellyfin-web.git
           git fetch jellyfin --tags
 
       - name: Rebase onto Jellyfin
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           git rebase --onto ${{ env.JELLYFIN_SOURCE_TAG }} ${{ env.XPOSED_BASE_TAG }} HEAD
-
-      - name: Build Jellyfin web
+      
+      - name: Build Jellyfin web and rename tarball
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           SOURCE_DIR=. ARTIFACT_DIR=./artifacts ./deployment/build.${{ env.JELLYFIN_BUILD_PLATFORM }}
+          mv ./artifacts/jellyfin-web_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz ./artifacts/jellyfin-xposed.tar.gz
+
+        # the following steps might vary on ref so cannot be skipped
 
       - name: Untar Jellyfin tarball
         working-directory: ./artifacts
-        run: tar xvf ./jellyfin-web_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz
+        run: tar xvf ./jellyfin-xposed.tar.gz
       
       - name: Build and push
         uses: docker/build-push-action@v2
@@ -93,12 +113,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
       
-      - name: Rename tarball
-        working-directory: ./artifacts
-        run: mv ./jellyfin-web_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz ./jellyfin-xposed.tar.gz
-      
       - name: Upload tarball to release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.ref_type == 'tag'
         with:
           files: ./artifacts/jellyfin-xposed.tar.gz
+          name: ${{ env.JELLYFIN_VERSION }}-xp-${{ env.GITHUB_REF_NAME }}
