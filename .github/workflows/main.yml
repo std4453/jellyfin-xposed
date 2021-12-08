@@ -91,3 +91,13 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      
+      - name: Rename tarball
+        working-directory: ./artifacts
+        run: mv ./jellyfin-web_${{ env.JELLYFIN_VERSION }}_${{ env.JELLYFIN_BUILD_PLATFORM }}.tar.gz ./jellyfin-xposed.tar.gz
+      
+      - name: Upload tarball to release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ./artifacts/jellyfin-xposed.tar.gz
