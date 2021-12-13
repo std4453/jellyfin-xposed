@@ -38,31 +38,81 @@ We also build a [github actions workflow](.github/workflows/main.yml) to automat
 
 Lastly, we add a simple plugin [`xposed/plugin`](src/plugins/xposed/plugin.js) which finds scripts to load from config and loads them after Jellyfin is initialized.
 
-## How to use `jellyfin-xposed`?
+## Installing `jellyfin-xposed` to your Jellyfin server
 
-First you have to divide your Jellyfin deployment into two parts, a.k.a. frontend and backend.
+For users' simplicity, Jellyfin (that is to say the [`linuxserver/jellyfin` image](https://hub.docker.com/r/linuxserver/jellyfin)) packages its frontend alongside with the server, while now you need to replace these files with those from `jellyfin-xposed`.
 
-`jellyfin-web` is fully static after build, so it could be served easily with any static file server. 
+Here, you can either replace old files in-place with tarballs downloaded from [releases page](https://github.com/std4453/jellyfin-xposed/releases), or you can use `ghcr.io/std4453/jellyfin-xposed` docker image (choose your version on the [packages page](https://github.com/std4453/jellyfin-xposed/pkgs/container/jellyfin-xposed)), which serves the frontend on port 80 via [nginx](https://hub.docker.com/_/nginx).
 
-Originally, Jellyfin serves the frontend under `web/`, other paths should be sent to the backend. After the splitting, you might need a reverse proxy to serve both parts under one domain. Now verify that your deployment is correct.
+In the latter case, you should serve all requests to prefix `/web` to the client (and removing the prefix), and others to the server.
 
-Then, you need to replace your `jellyfin-web` files with `jellyfin-xposed` files, you can either replace old files in-place with tarballs downloaded from [releases page](https://github.com/std4453/jellyfin-xposed/releases), or you can use `ghcr.io/std4453/jellyfin-xposed` docker image (choose your version on the [packages page](https://github.com/std4453/jellyfin-xposed/pkgs/container/jellyfin-xposed)), which serves the frontend on port 80 via [nginx](https://hub.docker.com/_/nginx).
+`jellyfin-xposed` is bundled with a default [`config.json`](src/config.json), which loads no external scripts, you will have to modify the file yourself (if you're hosting it statically), or mount your modified config into the docker container. 
 
-`jellyfin-xposed` is bundled with a default [`config.json`](src/config.json), which loads no external scripts, you will have to modify the file yourself (if you're hosting it statically), you mount your modified config into the docker container. 
-
-Eitherways, make sure that your config loads `xposed/plugin`.
-
-Finally, deploy your `jellyfin-xposed`-powered plugin as a single JS file, and add its URL to `loadScripts` in `config.json`, now refresh Jellyfin and you're free to go!
+Eitherways, make sure that your config loads `xposed/plugin`, which is the prerequisite for the following actions.
 
 ## Writing plugins with `jellyfin-xposed`
 
-All modules under `src/components` are exported under the `Xp` global variable, using a set of rules to convert module and export name to object paths. For further details, read comments in [`babel-plugin-xposed.js`](babel-plugin-xposed.js) and plugin config in [`babel.config.js`](babel.config.js).
+> If you're just using `jellyfin-xposed`-powered plugins, you can skip this part.
+
+Most core components of `jellyfin-web` are under `src/components`, like `playbackManager` and `appHost`.
+
+Although access to these modules will be unavailable after the `webpack` build process, `jellyfin-xposed` exposes them under the `Xp` global variable, using a set of rules to convert module and export name to object paths. 
+
+For further details, read comments in [`babel-plugin-xposed.js`](babel-plugin-xposed.js) and plugin config in [`babel.config.js`](babel.config.js).
 
 Additionally, `page` and `jellyfin-apiclient.Events` are exported as `Xp.page` and `Xp.Events`, as they're used for adding routes and listening to Events. Meanwhile, you can monkey-patch functions on objects to override default functionalities, we're looking forward to providing a simple framework for developing `jellyfin-web`-based plugins.
 
 Unfortunately, it is out of our ability to provide detailed documentation of the `jellyfin-web` internals, you'll have to read `jellyfin-web` source code to do that.
 
-You can find an example plugin at [`jfdmk`](https://github.com/std4453/jfdmk).
+---
+
+A basic plugin is a simple script which runs after all `Xp` variables are available, where you can hook `jellyfin-web` modules and modify the interface of a certain page.
+
+An example could be found in [`jfdmk`](https://github.com/std4453/jfdmk).
+
+However, it takes more effort to add an initial route, that is, a route that can act as the first route upon app startup.
+
+The problem here is that Jellyfin trys to resolve the route directly after all plugins are loaded, by which time there's no guarentee that all the scripts provided to `jellyfin-xposed` are already loaded.
+
+If the initial route is not present in the routing table of `jellyfin-web`, it will exit the app, so we can't wait until each plugin registers its own routes.
+
+To solve this issue, `jellyfin-xposed` registers a route prefix `/xposed` on plugin load, so Jellyfin think that the route is already matched and will not exit the app.
+
+Then, when individual scripts load, they can call `Xp.page()` to register their routes under `/xposed`, and the new routes will apply automatically.
+
+---
+
+As of `1.2.0`, `jellyfin-xposed` supports (and recommends) using app lifecycle hooks to control the behavior of plugins.
+
+This feature requires plugins to reside as an ES Module with an object as its default export, like:
+
+```javascript
+export default {
+  appInitialized() {
+  },
+};
+```
+
+The `appInitialized` hook will only be called after `jellyfin-web` has started and connected to a Jellyfin server. Then it would a great chance to do each plugin's work.
+
+More lifecycle hooks will be added in the future.
+
+## Installing plugins for `jellyfin-xposed`
+
+The `config.json` file is used for configurating `jellyfin-xposed`, like:
+
+```json
+{
+  "loadScripts": [
+    "https://<host>/script.js"
+  ],
+  "loadModules": [
+    "https://<host>/module.js"
+  ]
+}
+```
+
+The two types are used to distinguish between a script (without an export) and a module (with an export).
 
 ## Author
 
